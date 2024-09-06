@@ -3,14 +3,19 @@ import { detectRecordStruct } from '../viewmodel/resultModel'
 import ResultsTable from '../common/database/tables/resultTable'
 import dayjs from "@hview/dayjs"
 import { photoPickerGetUri } from '../common/utils/PictureSaving';
-import { detect } from '../common/utils/detect'
+import { detect, detectUrl, cacheDir } from '../common/utils/detect'
 import { SelectDialog } from '@kit.ArkUI'
+import { showToast } from '../common/utils/ToastUtils'
+import { taskpool, uri } from '@kit.ArkTS';
 
 @Component
 export struct predictorPage {
   @State defectCount: number = 0
   @State allCount: number = 0
   @State isStart: boolean = false
+
+  @State detectUrl:string = detectUrl
+  @State cacheDir:string = cacheDir
 
   @State dateList: string[] = []
   @State photoArr:Map<string, detectRecordStruct[]> = new Map<string, detectRecordStruct[]>()
@@ -34,9 +39,15 @@ export struct predictorPage {
           }
         },
         {
-          title: '继续检测',
+          title: '继续检测(多线程并行)',
           action: () => {
             this.radioIndex = 1
+          }
+        },
+        {
+          title: '继续检测(单线程串行)',
+          action: () => {
+            this.radioIndex = 2
           }
         },
       ]
@@ -65,47 +76,101 @@ export struct predictorPage {
               family: 'sans-serif'
             })
 
-          Button(this.isStart ? '结束': '开始', { type: ButtonType.Circle, stateEffect: true })
+          Button(this.isStart ? '检测中': '开始', { type: ButtonType.Circle, stateEffect: true })
             .width(150)
-            .fontSize(40)
-            .margin({ 'bottom': 15 })
+            .fontSize(30)
+            .enabled(!this.isStart)
             .onClick(async() => {
               let uris = await photoPickerGetUri(10)
               let count = 0
+              let successDetect = 0
               this.isStart = true
-              for (let i=0; i<uris.length; i++) {
-                let res = await detect(uris[i])
-                if (res[0] == 0) {
-                  await this.addResult(res[1])
-                }
-                // 报警
-                if (res[1].detect_count > 0) {
-                  count += 1
-                  if (this.radioIndex == 0) {
-                    AlertDialog.show(
-                      {
-                        title: '检测已中止',
-                        message: `检测到${res[1].detect_count}处缺陷，请注意查看`,
-                        autoCancel: true,
-                        alignment: DialogAlignment.Bottom,
-                        offset: { dx: 0, dy: -20 },
-                        gridCount: 3,
-                        confirm: {
-                          value: '我知道了',
-                          action: () => {
-                            console.info('Button-clicking callback')
-                          }
-                        }
+
+              if (this.radioIndex == 1) {
+                // 多线程
+                let number: number = Math.floor(uris.length / 2);
+
+                for (let i = 0; i < number; i++) {
+                  let group: taskpool.TaskGroup = new taskpool.TaskGroup();
+                  group.addTask(await detect, uris[i], this.detectUrl, this.cacheDir);
+                  group.addTask(await detect, uris[number+i], this.detectUrl, this.cacheDir);
+
+                  let ret = await taskpool.execute(group, taskpool.Priority.HIGH)
+                  let results = ret as [number, detectRecordStruct][]
+                  for (let i = 0; i<2; i++) {
+                    if (results[i][0] == 0) {
+                      successDetect += 1
+                      this.addResult(results[i][1])
+                      if (results[i][1].detect_count > 0) {
+                        count += 1
                       }
-                    )
-                    this.isStart = false
-                    break
+                    } else {
+                      showToast("检测失败")
+                    }
                   }
                 }
-
+                // 奇数
+                if (uris.length % 2) {
+                  let result = await detect(uris[-1], this.detectUrl, this.cacheDir)
+                  if (result[0] == 0) {
+                    successDetect += 1
+                    this.addResult(result[1])
+                    if (result[1].detect_count > 0) {
+                      count += 1
+                    }
+                  } else {
+                    showToast("检测失败")
+                  }
+                }
+              } else if (this.radioIndex == 2) {
+                // 单线程串行预测
+                for (let i = 0; i < uris.length; i++) {
+                  let result = await detect(uris[i], this.detectUrl, this.cacheDir)
+                  if (result[0] == 0) {
+                    successDetect += 1
+                    this.addResult(result[1])
+                    if (result[1].detect_count > 0) {
+                      count += 1
+                    }
+                  } else {
+                    showToast("检测失败")
+                  }
+                }
+              } else {
+                // 遇到报错停止
+                for (let i = 0; i < uris.length; i++) {
+                  let result = await detect(uris[i], this.detectUrl, this.cacheDir)
+                  if (result[0] == 0) {
+                    successDetect += 1
+                    this.addResult(result[1])
+                    if (result[1].detect_count > 0) {
+                      AlertDialog.show(
+                        {
+                          title: '检测已中止',
+                          message: `检测到${result[1].detect_count}处缺陷，请注意查看`,
+                          autoCancel: true,
+                          alignment: DialogAlignment.Bottom,
+                          offset: { dx: 0, dy: -20 },
+                          gridCount: 3,
+                          confirm: {
+                            value: '我知道了',
+                            action: () => {
+                              console.info('Button-clicking callback')
+                            }
+                          }
+                        }
+                      )
+                      this.isStart = false
+                      break
+                    }
+                  } else {
+                    showToast("检测失败")
+                  }
+                }
               }
-              if (this.isStart) {
-                this.isStart = false
+
+              // 结束
+              if (successDetect > 0 && this.isStart) {
                 AlertDialog.show(
                   {
                     title: '检测完成',
@@ -120,13 +185,13 @@ export struct predictorPage {
                         console.info('Button-clicking callback')
                       }
                     }
-                  }
-                )
+                  })
               }
+              this.isStart = false
             })
           if (!this.isStart) {
             Button('设置', { buttonStyle: ButtonStyleMode.NORMAL })
-              .margin({ 'bottom': 15 })
+              .margin({ 'top': 15 })
               .enabled(!this.isStart)
               .onClick(() => {
                 this.dialogControllerList.open()
@@ -173,6 +238,25 @@ export struct predictorPage {
     }
   }
 
+  // async detectUris(uris: string[]): void {
+  //   for (let i = 0; i < uris.length; i++) {
+  //     detectAndRecord(uris[i])
+  //     this.add
+  //   }
+  //   let number: number = uris.length / 2;
+  //   let uris1: string[] = uris.slice(0, number);
+  //   let uris2: string[] = uris.slice(number, -1);
+  //
+  //   let group: taskpool.TaskGroup = new taskpool.TaskGroup();
+  //   group.addTask(imageProcessing, buffer1);
+  //   group.addTask(imageProcessing, buffer2);
+  //   group.addTask(imageProcessing, buffer3);
+  //
+  //   taskpool.execute(group, taskpool.Priority.HIGH).then((ret: Object) => {
+  //     // 步骤3: 结果数组汇总处理
+  //   })
+  // }
+
   async addResult(dataSample: detectRecordStruct) {
     await this.resultsTable.getRdbStore()
     await this.resultsTable.insertData(dataSample);
@@ -193,4 +277,6 @@ export struct predictorPage {
 
     this.updateCount()
   }
+
+
 }

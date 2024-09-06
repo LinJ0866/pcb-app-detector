@@ -95,6 +95,7 @@ export struct AlbumView {
       Text(this.dateTime)
         .width('90%')
         .textAlign(TextAlign.Start)
+        .margin({ top: 15 })
       Grid() {
         ForEach(this.records, (item: detectRecordStruct, idx) => {
           GridItem() {
@@ -139,8 +140,9 @@ export struct AlbumView {
                   title:{title:"检测详情", subtitle:item.date},
                 })
             }
+            .margin({ right: 8 })
           }
-          .padding( { 'top': 5 } )
+          .padding( { top: 6 } )
           .width('100%')
           .aspectRatio(1)
         })

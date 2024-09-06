@@ -1,7 +1,7 @@
 import { LengthMetricsUnit } from '@kit.ArkUI'
 import image from '@ohos.multimedia.image';
 import { photoPickerGetUri, getPixelMap, copyPixelMap } from '../common/utils/PictureSaving';
-import { detect, detectRes, parseResult } from '../common/utils/detect'
+import { detect, detectRes, parseResult, detectUrl, cacheDir } from '../common/utils/detect'
 import Logger from '../common/utils/Logger';
 import { showToast } from '../common/utils/ToastUtils'
 
@@ -18,6 +18,9 @@ export struct debugPage {
   @State image_x: number = 0
   @State image_y: number = 0
   @State imageScale: number = 0
+
+  @State detectUrl:string = detectUrl
+  @State cacheDir:string = cacheDir
 
   @Consume('pageInfos') pageInfos: NavPathStack;
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
@@ -93,7 +96,7 @@ export struct debugPage {
                 this.updateShow()
 
                 this.isSubmit = true;
-                let result = await detect(uris[0])
+                let result = await detect(uris[0], this.detectUrl, this.cacheDir)
 
                 this.isSubmit = false;
                 if (result[0] != 0) {
