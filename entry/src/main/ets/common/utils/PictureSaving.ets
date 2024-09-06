@@ -45,6 +45,7 @@ export async function photoPickerGetUri(maxNum:number = 1): Promise<Array<string
     Logger.error('PhotoViewPicker failed with err: ' + err.message);
   }
   Logger.info('PhotoViewPicker' + uris[0]);
+  // await getPixelMap(uris)
 
   return uris
 }
@@ -57,6 +58,7 @@ export async function getPixelMap(uri:string): Promise<PixelMap> {
     const imageSourceApi = image.createImageSource(file.fd);
 
     img = await imageSourceApi.createPixelMap()
+    img = await copyPixelMap(img)
   } catch(e) {
     Logger.error('PhotoViewPicker.getPixelMap failed with err: ' + JSON.stringify(e));
   }
@@ -65,3 +67,16 @@ export async function getPixelMap(uri:string): Promise<PixelMap> {
 }
 
 
+export async function copyPixelMap(pm: PixelMap): Promise<PixelMap> {
+  const imageInfo: image.ImageInfo = await pm.getImageInfo();
+  const buffer: ArrayBuffer = new ArrayBuffer(pm.getPixelBytesNumber());
+  // TODO 知识点：通过readPixelsToBuffer实现PixelMap的深拷贝，其中readPixelsToBuffer输出为BGRA_8888
+  await pm.readPixelsToBuffer(buffer);
+  // TODO 知识点：readPixelsToBuffer输出为BGRA_8888,此处createPixelMap需转为RGBA_8888
+  const opts: image.InitializationOptions = {
+    editable: true,
+    pixelFormat: image.PixelMapFormat.RGBA_8888,
+    size: { height: imageInfo.size.height, width: imageInfo.size.width }
+  };
+  return await image.createPixelMap(buffer, opts);
+}
