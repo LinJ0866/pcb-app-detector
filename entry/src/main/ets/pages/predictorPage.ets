@@ -214,6 +214,7 @@ export struct predictorPage {
         console.log('pop' + '返回值' + JSON.stringify(popDestinationInfo))
         return true
       })
+    .backgroundColor($r('app.color.start_window_background'))
 
   }
 

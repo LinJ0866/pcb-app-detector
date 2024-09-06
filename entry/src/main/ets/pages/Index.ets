@@ -1,5 +1,6 @@
 import { debugPage } from './debugPage'
 import { predictorPage } from './predictorPage'
+import { window } from '@kit.ArkUI'
 
 interface btnItemStruct {
   name: string,
@@ -36,27 +37,25 @@ struct Index {
   }
 
   build() {
-    Column() {
-      Navigation(this.pageInfos){
-        ForEach(this.btnList, (item:btnItemStruct) => {
-          Row()
-            .backgroundImage(item.picUrl)
-            .backgroundImageSize(ImageSize.Cover)
-            .height(110)
-            .margin({top: 20})
-            .width("90%")
-            .borderRadius(32)
-            .onClick(() => {
-              this.pageInfos.pushPath({ name: item.uri})
-            })
-        })
+    Navigation(this.pageInfos){
+      ForEach(this.btnList, (item:btnItemStruct) => {
+        Row()
+          .backgroundImage(item.picUrl)
+          .backgroundImageSize(ImageSize.Cover)
+          .height(110)
+          .margin({top: 20})
+          .width("90%")
+          .borderRadius(32)
+          .onClick(() => {
+            this.pageInfos.pushPath({ name: item.uri})
+          })
+      })
 
-      }.title("PCB缺陷检测")
-        .navDestination(this.PageMap)
-    }
+    }.title("PCB缺陷检测")
+      .navDestination(this.PageMap)
     .height('100%')
     .width('100%')
-    .backgroundColor('#ffffff')
+    .backgroundColor($r('app.color.start_window_background'))
   }
 }
 

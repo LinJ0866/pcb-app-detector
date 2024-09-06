@@ -62,12 +62,6 @@ export struct debugPage {
               })
           )
 
-        // Canvas(this.contextPX)
-        //   .backgroundImage(this.preImage, ImageRepeat.NoRepeat)
-        //   .backgroundImageSize(ImageSize.Contain)
-        //   .width('90%')
-        //   .height(300)
-
         Row() {
           Button(){
             Row() {
@@ -162,6 +156,7 @@ export struct debugPage {
       console.log('pop' + '返回值' + JSON.stringify(popDestinationInfo))
       return true
     })
+    .backgroundColor($r('app.color.start_window_background'))
   }
   bboxDrawer(result: detectRes) {
     console.info('detectDrawer: start.')
